@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DelveStats
 
-## Getting Started
+Self-hosted dashboard for monitoring AI API costs and usage across multiple providers in one unified view.
 
-First, run the development server:
+> **No proxy required.** DelveStats reads usage data directly from each provider's billing API — no need to route your API calls through a middleman.
+
+## Supported Providers
+
+| Provider | Status | API Key Type |
+|----------|--------|--------------|
+| Anthropic | Full support | Admin key (`sk-ant-admin-...`) |
+| OpenAI | Full support | Admin key |
+| Google AI (Gemini) | Coming soon | — |
+| Kimi (Moonshot) | Coming soon | — |
+
+## Deploy
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Falittlenerdy%2Fdelvestats&env=TURSO_DATABASE_URL,TURSO_AUTH_TOKEN,CRON_SECRET&envDescription=Required%20environment%20variables&project-name=delvestats)
+
+### Prerequisites
+
+1. A [Turso](https://turso.tech) database (free tier works)
+2. Admin API keys from your AI providers
+3. A Vercel account (Pro plan for hourly cron; Hobby for daily)
+
+### Setup
+
+1. Clone this repo
+2. Copy `.env.example` to `.env.local` and fill in your keys
+3. Create a Turso database:
+   ```bash
+   turso db create delvestats
+   turso db tokens create delvestats
+   ```
+4. Push the database schema:
+   ```bash
+   npx drizzle-kit push
+   ```
+5. Run locally:
+   ```bash
+   npm run dev
+   ```
+
+## Configuration
+
+All configuration is via environment variables. See [`.env.example`](.env.example) for the full list.
+
+### Alert Webhooks
+
+DelveStats sends Slack-formatted JSON payloads to your webhook URL when spend exceeds thresholds. Works with:
+
+- **Slack** — Create an Incoming Webhook
+- **Discord** — Use a Slack-compatible webhook URL (`/slack` suffix)
+- **Microsoft Teams** — Use an Incoming Webhook connector
+- **Zapier/Make** — Use a Webhook trigger
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev    # Start dev server
+npm test       # Run tests
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Adding a Provider
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Each provider implements the `UsageProvider` interface from `src/providers/types.ts`:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```typescript
+interface UsageProvider {
+  name: string;
+  fetchUsage(startDate: Date, endDate: Date): Promise<UsageRecord[]>;
+  isConfigured(): boolean;
+}
+```
 
-## Learn More
+1. Create `src/providers/yourprovider.ts` implementing the interface
+2. Add it to the `allProviders` array in `src/providers/registry.ts`
+3. Add the API key env var to `src/lib/env.ts` and `.env.example`
 
-To learn more about Next.js, take a look at the following resources:
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
