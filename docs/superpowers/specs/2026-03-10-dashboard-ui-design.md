@@ -92,20 +92,17 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 ```typescript
 {
   kpi: {
-    today: number,
-    week: number,
-    month: number,
+    today: number,      // USD spent since midnight UTC
+    week: number,       // USD spent last 7 days
+    month: number,      // USD spent since 1st of current month
   },
   chart: Array<{
-    date: string,
-    anthropic: number,
-    openai: number,
-    google: number,
-    kimi: number,
+    date: string,       // "2026-03-10"
+    [provider: string]: number, // dynamic keys per provider, USD per day
   }>,
   providers: Array<{
     name: string,
-    totalCost: number,
+    totalCost: number,  // this month's total for this provider
     models: Array<{
       model: string,
       inputTokens: number,
@@ -113,16 +110,17 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
       cost: number,
     }>,
     lastPollStatus: "ok" | "error",
-    lastPollAt: string,
+    lastPollAt: string, // from most recent poll_log entry for this provider
   }>,
   table: Array<{
     provider: string,
     model: string,
     inputTokens: number,
     outputTokens: number,
-    cost: number,
-    trend: number,
+    cost: number,       // this month's cost
+    trend: number,      // % change: this week vs previous week (positive = spending more = red, negative = spending less = green)
   }>,
+  lastPolledAt: string, // most recent polled_at from poll_log (any provider)
 }
 ```
 
@@ -133,10 +131,11 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 4. User clicks refresh button → re-fetches, state updates, no page reload
 
 ### New DB Queries (added to `src/db/queries.ts`)
-- `getKpiSpend(db)` — today/week/month totals
-- `getDailySpendByProvider(db, days)` — last N days grouped by date + provider
-- `getProviderBreakdown(db)` — per-provider, per-model aggregation
-- `getModelTrends(db)` — current vs previous period % change
+- `getKpiSpend(db)` — today (since midnight UTC), this week (last 7 days), this month (since 1st) totals
+- `getDailySpendByProvider(db, days)` — last N days grouped by date + provider. Returns rows `{date, provider, cost}`, pivoted to chart shape in the API route
+- `getProviderBreakdown(db)` — per-provider, per-model aggregation for current month
+- `getModelTrends(db)` — this week vs previous week per model, returns % change (positive = spending increased)
+- `getLatestPollPerProvider(db)` — most recent poll_log entry per provider (status + timestamp)
 
 ---
 
@@ -145,7 +144,7 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 ### KPI Cards
 - Three cards in a row
 - Label + dollar amount in Geist Mono (text-3xl)
-- Neon green glow on active/highest card: `box-shadow: 0 0 20px rgba(57, 255, 20, 0.15)`
+- All cards get a subtle neon green border glow: `box-shadow: 0 0 20px rgba(57, 255, 20, 0.15)`
 - Zinc-900 background, zinc-700 border
 
 ### Spend Chart
@@ -165,15 +164,21 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 ### Usage Table
 - shadcn/ui DataTable
 - Columns: Provider, Model, Input Tokens, Output Tokens, Cost, Trend
-- Trend: green arrow + % for positive, pink arrow for negative
+- Trend: pink arrow up + % when spending increased, green arrow down when decreased (cost monitoring — less spend = good)
 - Sortable columns, provider filter dropdown
 - Alternating rows (zinc-900 / zinc-950)
 - Formatted numbers: commas for tokens, 2 decimals for costs
 
 ### Top Bar
 - "DelveStats" logo text with neon green accent
-- "Last polled: Xm ago" in zinc-400
+- "Last polled: Xm ago" in zinc-400 — sourced from `lastPolledAt` in API response (most recent poll_log entry)
 - Refresh button with neon yellow hover glow
+
+### Loading & Error States
+- **Loading:** Zinc-800 skeleton rectangles matching each component's shape (pulsing animation)
+- **API error:** Red banner at top: "Failed to load data. [Retry]" — components show last successful data if available, empty state otherwise
+- **Empty provider:** Provider card still renders with "No data yet" in zinc-500 text, zero-value model list hidden
+- **No data at all (fresh install):** Friendly empty state: "No usage data yet. Configure your provider API keys and wait for the first poll."
 
 ---
 
@@ -186,6 +191,14 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 
 ---
 
+## Design Spec Deviations
+
+The original design spec (docs/design-spec.md) included features intentionally deferred:
+- **Expandable/collapsible provider cards** — dropped for v1, cards always show full model list (simpler, and with 2-4 providers the list is short)
+- **Summary row in data table** — dropped, KPI cards already serve this purpose
+- **Provider progress bars in overview** — dropped, the stacked bar chart + provider cards cover relative spend
+- **Date range filter on table** — deferred to v2 (listed in Out of Scope)
+
 ## Out of Scope
 
 - Settings UI (use env vars)
@@ -193,3 +206,4 @@ No auth (single-user dashboard). Returns all dashboard data in one request:
 - Real-time WebSocket updates
 - Menu bar app (separate project)
 - Date range picker (future enhancement)
+- Expandable/collapsible provider cards (v2)
