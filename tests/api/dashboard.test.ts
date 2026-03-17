@@ -17,6 +17,8 @@ const mockGetLatestPollPerProvider = vi.fn().mockResolvedValue([
   { provider: "anthropic", status: "ok", polledAt: "2026-03-10T12:00:00Z" },
   { provider: "openai", status: "ok", polledAt: "2026-03-10T11:30:00Z" },
 ]);
+const mockGetDistinctProjects = vi.fn().mockResolvedValue(["brilliant-nerd", "replysequence"]);
+const mockGetLatestIngestTimestamp = vi.fn().mockResolvedValue("2026-03-16T12:00:00Z");
 
 vi.mock("@/db/dashboard-queries", () => ({
   getKpiSpend: (...args: unknown[]) => mockGetKpiSpend(...args),
@@ -24,6 +26,8 @@ vi.mock("@/db/dashboard-queries", () => ({
   getProviderBreakdown: (...args: unknown[]) => mockGetProviderBreakdown(...args),
   getModelTrends: (...args: unknown[]) => mockGetModelTrends(...args),
   getLatestPollPerProvider: (...args: unknown[]) => mockGetLatestPollPerProvider(...args),
+  getDistinctProjects: (...args: unknown[]) => mockGetDistinctProjects(...args),
+  getLatestIngestTimestamp: (...args: unknown[]) => mockGetLatestIngestTimestamp(...args),
 }));
 
 vi.mock("@/db/client", () => ({
@@ -38,7 +42,7 @@ describe("dashboard API route", () => {
   });
 
   it("returns dashboard data with correct shape", async () => {
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/dashboard"));
     expect(res.status).toBe(200);
 
     const body = await res.json();
@@ -52,7 +56,7 @@ describe("dashboard API route", () => {
   });
 
   it("pivots daily spend into chart format", async () => {
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/dashboard"));
     const body = await res.json();
 
     const chartDay = body.chart[0];
@@ -61,7 +65,7 @@ describe("dashboard API route", () => {
   });
 
   it("groups provider breakdown into nested structure", async () => {
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/dashboard"));
     const body = await res.json();
 
     const anthropic = body.providers.find((p: { name: string }) => p.name === "anthropic");
@@ -71,10 +75,26 @@ describe("dashboard API route", () => {
   });
 
   it("merges trends into table data", async () => {
-    const res = await GET();
+    const res = await GET(new Request("http://localhost/api/dashboard"));
     const body = await res.json();
 
     const sonnet = body.table.find((r: { model: string }) => r.model === "claude-sonnet-4");
     expect(sonnet.trend).toBe(12.5);
+  });
+
+  it("passes project query param to queries", async () => {
+    const req = new Request("http://localhost/api/dashboard?project=replysequence");
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+    expect(mockGetKpiSpend).toHaveBeenCalledWith(expect.anything(), "replysequence");
+    expect(mockGetDailySpendByProvider).toHaveBeenCalledWith(expect.anything(), 30, "replysequence");
+  });
+
+  it("includes projects and lastDataAt in response", async () => {
+    const req = new Request("http://localhost/api/dashboard");
+    const res = await GET(req);
+    const body = await res.json();
+    expect(body.projects).toEqual(["brilliant-nerd", "replysequence"]);
+    expect(body.lastDataAt).toBe("2026-03-16T12:00:00Z");
   });
 });

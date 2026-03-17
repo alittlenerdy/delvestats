@@ -5,18 +5,25 @@ import {
   getProviderBreakdown,
   getModelTrends,
   getLatestPollPerProvider,
+  getDistinctProjects,
+  getLatestIngestTimestamp,
 } from "@/db/dashboard-queries";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-  const [kpi, dailySpend, breakdown, trends, polls] = await Promise.all([
-    getKpiSpend(db),
-    getDailySpendByProvider(db, 30),
-    getProviderBreakdown(db),
-    getModelTrends(db),
+    const url = new URL(request.url);
+    const project = url.searchParams.get("project") ?? undefined;
+
+  const [kpi, dailySpend, breakdown, trends, polls, projects, lastDataAt] = await Promise.all([
+    getKpiSpend(db, project),
+    getDailySpendByProvider(db, 30, project),
+    getProviderBreakdown(db, project),
+    getModelTrends(db, project),
     getLatestPollPerProvider(db),
+    getDistinctProjects(db),
+    getLatestIngestTimestamp(db, project),
   ]);
 
   // Pivot daily spend rows into chart format: { date, anthropic: X, openai: Y, ... }
@@ -75,7 +82,7 @@ export async function GET() {
   // Most recent poll timestamp across all providers
   const lastPolledAt = polls.length > 0 ? polls[0].polledAt : "";
 
-  return Response.json({ kpi, chart, providers, table, lastPolledAt });
+  return Response.json({ kpi, chart, providers, table, lastPolledAt, projects, lastDataAt });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";
     return Response.json({ error: message }, { status: 500 });
