@@ -17,4 +17,7 @@ export const env = {
 
   // Cron
   cronSecret: process.env.CRON_SECRET,
+
+  // Ingest
+  ingestApiKey: process.env.INGEST_API_KEY,
 } as const;

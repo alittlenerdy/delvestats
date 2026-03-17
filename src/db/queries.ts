@@ -13,6 +13,15 @@ export const insertUsageRecords = async (
   await db.insert(usageRecords).values(records);
 };
 
+export const insertUsageRecordsIgnoreDuplicates = async (
+  db: DB,
+  records: (typeof usageRecords.$inferInsert)[]
+) => {
+  if (records.length === 0) return 0;
+  const result = await db.insert(usageRecords).values(records).onConflictDoNothing();
+  return result.rowsAffected;
+};
+
 export const getSpendByPeriod = async (
   db: DB,
   start: string,

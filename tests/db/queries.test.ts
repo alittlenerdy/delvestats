@@ -15,6 +15,8 @@ describe("database queries", () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       provider TEXT NOT NULL,
       model TEXT NOT NULL,
+      project TEXT,
+      request_id TEXT UNIQUE,
       input_tokens INTEGER NOT NULL,
       output_tokens INTEGER NOT NULL,
       cost_usd REAL NOT NULL,

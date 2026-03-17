@@ -1,6 +1,7 @@
 export interface UsageRecord {
   provider: string;
   model: string;
+  project?: string;
   inputTokens: number;
   outputTokens: number;
   costUsd: number;

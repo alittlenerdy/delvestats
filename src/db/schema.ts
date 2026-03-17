@@ -4,6 +4,8 @@ export const usageRecords = sqliteTable("usage_records", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   provider: text("provider").notNull(),
   model: text("model").notNull(),
+  project: text("project"),
+  requestId: text("request_id").unique(),
   inputTokens: integer("input_tokens").notNull(),
   outputTokens: integer("output_tokens").notNull(),
   costUsd: real("cost_usd").notNull(),
