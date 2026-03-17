@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export default function Home() {
-  return <DashboardShell />;
+  return (
+    <Suspense>
+      <DashboardShell />
+    </Suspense>
+  );
 }

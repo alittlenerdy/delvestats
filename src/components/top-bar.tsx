@@ -5,23 +5,38 @@ import { timeAgo } from "@/lib/format";
 import { RefreshCw } from "lucide-react";
 
 interface TopBarProps {
-  lastPolledAt: string;
+  lastDataAt: string;
+  projects: string[];
+  selectedProject: string | null;
+  onProjectChange: (project: string | null) => void;
   onRefresh: () => void;
   isLoading: boolean;
 }
 
-export function TopBar({ lastPolledAt, onRefresh, isLoading }: TopBarProps) {
+export const TopBar = ({ lastDataAt, projects, selectedProject, onProjectChange, onRefresh, isLoading }: TopBarProps) => {
   return (
     <header className="flex items-center justify-between border-b border-[var(--border)] px-6 py-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
         <span className="text-xl font-bold tracking-tight">
           <span className="text-[var(--neon-green)]">Delve</span>Stats
         </span>
+        {projects.length > 0 && (
+          <select
+            value={selectedProject ?? ""}
+            onChange={(e) => onProjectChange(e.target.value || null)}
+            className="rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-mono text-foreground focus:outline-none focus:ring-1 focus:ring-[var(--neon-green)]"
+          >
+            <option value="">All Projects</option>
+            {projects.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        )}
       </div>
       <div className="flex items-center gap-4">
-        {lastPolledAt && (
+        {lastDataAt && (
           <span className="text-sm text-muted-foreground font-mono">
-            Last polled: {timeAgo(lastPolledAt)}
+            Last data: {timeAgo(lastDataAt)}
           </span>
         )}
         <Button
@@ -36,4 +51,4 @@ export function TopBar({ lastPolledAt, onRefresh, isLoading }: TopBarProps) {
       </div>
     </header>
   );
-}
+};

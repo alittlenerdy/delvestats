@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { TopBar } from "./top-bar";
 import { KpiCards, KpiCardsSkeleton } from "./kpi-cards";
 import { SpendChart, SpendChartSkeleton } from "./spend-chart";
@@ -31,18 +32,25 @@ interface DashboardData {
     trend: number;
   }>;
   lastPolledAt: string;
+  lastDataAt: string;
+  projects: string[];
 }
 
-export function DashboardShell() {
+export const DashboardShell = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedProject = searchParams.get("project");
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/dashboard");
+      const params = selectedProject ? `?project=${selectedProject}` : "";
+      const res = await fetch(`/api/dashboard${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -51,18 +59,31 @@ export function DashboardShell() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [selectedProject]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleProjectChange = (project: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (project) {
+      params.set("project", project);
+    } else {
+      params.delete("project");
+    }
+    router.push(`?${params.toString()}`);
+  };
 
   const hasData = data && (data.providers.length > 0 || data.kpi.month > 0);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <TopBar
-        lastPolledAt={data?.lastPolledAt ?? ""}
+        lastDataAt={data?.lastDataAt ?? ""}
+        projects={data?.projects ?? []}
+        selectedProject={selectedProject}
+        onProjectChange={handleProjectChange}
         onRefresh={fetchData}
         isLoading={isLoading}
       />
@@ -83,7 +104,7 @@ export function DashboardShell() {
         {!hasData && !isLoading && !error && (
           <div className="rounded-lg border border-[var(--border)] bg-[var(--card)] p-12 text-center">
             <p className="text-lg text-muted-foreground">
-              No usage data yet. Configure your provider API keys and wait for the first poll.
+              No usage data yet. Set up the reporting middleware in your projects to start tracking.
             </p>
           </div>
         )}
@@ -106,4 +127,4 @@ export function DashboardShell() {
       </main>
     </div>
   );
-}
+};
