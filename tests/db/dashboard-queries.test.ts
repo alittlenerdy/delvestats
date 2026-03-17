@@ -8,6 +8,8 @@ import {
   getProviderBreakdown,
   getModelTrends,
   getLatestPollPerProvider,
+  getDistinctProjects,
+  getLatestIngestTimestamp,
 } from "@/db/dashboard-queries";
 
 const client = createClient({ url: "file::memory:" });
@@ -24,6 +26,7 @@ async function insertRecord(overrides: Partial<typeof schema.usageRecords.$infer
     recordedAt: new Date().toISOString(),
     periodStart: new Date().toISOString(),
     periodEnd: new Date().toISOString(),
+    project: null,
   };
   await testDb.insert(schema.usageRecords).values({ ...defaults, ...overrides });
 }
@@ -142,6 +145,65 @@ describe("dashboard queries", () => {
       const anthropic = latest.find((p) => p.provider === "anthropic");
       expect(anthropic!.status).toBe("error"); // most recent
       expect(anthropic!.polledAt).toBe("2026-03-10T11:00:00Z");
+    });
+  });
+
+  describe("project filtering", () => {
+    it("getKpiSpend filters by project", async () => {
+      const now = new Date();
+      const todayStr = now.toISOString().split("T")[0];
+      const todayStart = `${todayStr}T00:00:00.000Z`;
+
+      await insertRecord({ costUsd: 5.0, periodStart: todayStart, project: "replysequence" });
+      await insertRecord({ costUsd: 3.0, periodStart: todayStart, project: "brilliant-nerd" });
+
+      const all = await getKpiSpend(testDb);
+      expect(all.today).toBeCloseTo(8.0);
+
+      const rsOnly = await getKpiSpend(testDb, "replysequence");
+      expect(rsOnly.today).toBeCloseTo(5.0);
+    });
+
+    it("getProviderBreakdown filters by project", async () => {
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+
+      await insertRecord({ provider: "anthropic", model: "claude-sonnet-4", costUsd: 5.0, periodStart: monthStart, project: "replysequence" });
+      await insertRecord({ provider: "openai", model: "gpt-4o", costUsd: 3.0, periodStart: monthStart, project: "brilliant-nerd" });
+
+      const all = await getProviderBreakdown(testDb);
+      expect(all).toHaveLength(2);
+
+      const rsOnly = await getProviderBreakdown(testDb, "replysequence");
+      expect(rsOnly).toHaveLength(1);
+      expect(rsOnly[0].provider).toBe("anthropic");
+    });
+  });
+
+  describe("getDistinctProjects", () => {
+    it("returns unique project names", async () => {
+      await insertRecord({ project: "replysequence" });
+      await insertRecord({ project: "replysequence" });
+      await insertRecord({ project: "brilliant-nerd" });
+      await insertRecord({ project: null });
+
+      const projects = await getDistinctProjects(testDb);
+      expect(projects).toEqual(["brilliant-nerd", "replysequence"]);
+    });
+  });
+
+  describe("getLatestIngestTimestamp", () => {
+    it("returns most recent recorded_at", async () => {
+      await insertRecord({ recordedAt: "2026-03-15T10:00:00Z" });
+      await insertRecord({ recordedAt: "2026-03-16T12:00:00Z" });
+
+      const latest = await getLatestIngestTimestamp(testDb);
+      expect(latest).toBe("2026-03-16T12:00:00Z");
+    });
+
+    it("returns null when no records", async () => {
+      const latest = await getLatestIngestTimestamp(testDb);
+      expect(latest).toBeNull();
     });
   });
 });
