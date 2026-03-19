@@ -30,7 +30,8 @@ const fetchWithAuth = async (url: string) => {
     },
   });
   if (!res.ok) {
-    throw new Error(`OpenAI API error: ${res.status} ${res.statusText}`);
+    const body = await res.text().catch(() => "");
+    throw new Error(`OpenAI API error: ${res.status} ${res.statusText} — ${body}`);
   }
   return res.json();
 };
@@ -56,12 +57,16 @@ export const openaiProvider: UsageProvider = {
     const startUnix = Math.floor(startDate.getTime() / 1000);
     const endUnix = Math.floor(endDate.getTime() / 1000);
 
+    // Align costs query to day boundaries (OpenAI costs API only supports daily buckets)
+    const costStartUnix = Math.floor(startUnix / 86400) * 86400;
+    const costEndUnix = Math.ceil(endUnix / 86400) * 86400;
+
     const [usageBuckets, costBuckets] = await Promise.all([
       fetchAllPages<UsageBucket>(
         `${API_BASE}/usage/completions?start_time=${startUnix}&end_time=${endUnix}&bucket_width=1h&group_by[]=model`
       ),
       fetchAllPages<CostBucket>(
-        `${API_BASE}/costs?start_time=${startUnix}&end_time=${endUnix}&bucket_width=1d&group_by[]=line_item`
+        `${API_BASE}/costs?start_time=${costStartUnix}&end_time=${costEndUnix}&bucket_width=1d&group_by[]=line_item`
       ),
     ]);
 

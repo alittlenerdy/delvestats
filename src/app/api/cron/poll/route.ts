@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 import { db } from "@/db/client";
 import { getConfiguredProviders } from "@/providers/registry";
 import {
-  insertUsageRecords,
+  insertUsageRecordsIgnoreDuplicates,
   logPoll,
   getSpendByPeriod,
   getEnabledAlertRules,
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     try {
       const records = await provider.fetchUsage(startDate, endDate);
       if (records.length > 0) {
-        await insertUsageRecords(
+        await insertUsageRecordsIgnoreDuplicates(
           db,
           records.map((r) => ({
             ...r,
