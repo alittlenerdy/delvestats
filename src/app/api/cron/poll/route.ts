@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 import { db } from "@/db/client";
+import { ensureIndexes } from "@/db/ensure-indexes";
 import { getConfiguredProviders } from "@/providers/registry";
 import {
   insertUsageRecordsIgnoreDuplicates,
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  await ensureIndexes(db);
   const providers = getConfiguredProviders();
   const results: Array<{ provider: string; status: string; error?: string }> = [];
 

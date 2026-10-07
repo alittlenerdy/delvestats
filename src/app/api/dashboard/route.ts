@@ -1,4 +1,5 @@
 import { db } from "@/db/client";
+import { ensureIndexes } from "@/db/ensure-indexes";
 import {
   getKpiSpend,
   getDailySpendByProvider,
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
+    await ensureIndexes(db);
     const url = new URL(request.url);
     const project = url.searchParams.get("project") ?? undefined;
 
