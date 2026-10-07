@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index } from "drizzle-orm/sqlite-core";
 
 export const usageRecords = sqliteTable("usage_records", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -12,7 +12,10 @@ export const usageRecords = sqliteTable("usage_records", {
   recordedAt: text("recorded_at").notNull(),
   periodStart: text("period_start").notNull(),
   periodEnd: text("period_end").notNull(),
-});
+}, (t) => [
+  index("usage_records_period_start_idx").on(t.periodStart),
+  index("usage_records_provider_period_start_idx").on(t.provider, t.periodStart),
+]);
 
 export const alertRules = sqliteTable("alert_rules", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -30,4 +33,6 @@ export const pollLog = sqliteTable("poll_log", {
   status: text("status", { enum: ["ok", "error"] }).notNull(),
   errorMsg: text("error_msg"),
   polledAt: text("polled_at").notNull(),
-});
+}, (t) => [
+  index("poll_log_provider_polled_at_idx").on(t.provider, t.polledAt),
+]);

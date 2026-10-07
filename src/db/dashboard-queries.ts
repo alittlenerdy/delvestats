@@ -1,4 +1,4 @@
-import { sql, desc, isNotNull } from "drizzle-orm";
+import { sql, isNotNull } from "drizzle-orm";
 import { usageRecords, pollLog } from "./schema";
 import type { LibSQLDatabase } from "drizzle-orm/libsql";
 import type * as schema from "./schema";
@@ -130,29 +130,19 @@ export async function getLatestIngestTimestamp(db: DB, project?: string): Promis
 }
 
 export async function getLatestPollPerProvider(db: DB) {
-  // SQLite doesn't have DISTINCT ON, so we use a subquery for max polled_at per provider
+  // One pass over poll_log (index-only with poll_log_provider_polled_at_idx).
+  // SQLite returns the bare `status` column from the row holding MAX(polled_at).
+  // The previous IN + correlated MAX subquery was O(n^2): ~96M rows read per
+  // dashboard load at ~9.8k poll_log rows, which exhausted the Turso free
+  // plan's 500M monthly reads (blocked Aug 14, Sep 10, Oct 6 2026).
   const rows = await db
     .select({
       provider: pollLog.provider,
       status: pollLog.status,
-      polledAt: pollLog.polledAt,
+      polledAt: sql<string>`MAX(${pollLog.polledAt})`.as("polled_at"),
     })
     .from(pollLog)
-    .where(
-      sql`${pollLog.id} IN (
-        SELECT id FROM poll_log AS p2
-        WHERE p2.polled_at = (
-          SELECT MAX(p3.polled_at) FROM poll_log AS p3 WHERE p3.provider = p2.provider
-        )
-      )`
-    )
-    .orderBy(desc(pollLog.polledAt));
+    .groupBy(pollLog.provider);
 
-  // Deduplicate in case of ties
-  const seen = new Set<string>();
-  return rows.filter((r) => {
-    if (seen.has(r.provider)) return false;
-    seen.add(r.provider);
-    return true;
-  });
+  return rows.sort((a, b) => (a.polledAt < b.polledAt ? 1 : a.polledAt > b.polledAt ? -1 : 0));
 }
